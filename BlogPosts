@@ -1,0 +1,24 @@
+from sqlite3 import Date
+from turtle import title
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app =FastAPI()
+
+class Post(BaseModel):
+    id: str
+    post_title: str
+    content: str
+    createdAt: Date
+
+
+class Comment(BaseModel):
+    id: str
+    postId: str
+    author: str
+    text: str
+    createdAt: Date
+
+@app.post("/post")
+async def create_post(id: id, post_title: title):
+    return id, post_title
