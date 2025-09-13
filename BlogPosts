@@ -1,24 +1,102 @@
-from sqlite3 import Date
-from turtle import title
-from fastapi import FastAPI
+fromfrom fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from datetime import datetime
+from typing import Optional, List
+import uuid
 
-app =FastAPI()
+app = FastAPI(title="Blog Posts & Comments API")
 
-class Post(BaseModel):
-    id: str
-    post_title: str
+
+class PostCreate(BaseModel):
+    title: str
     content: str
-    createdAt: Date
 
+class PostUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
 
-class Comment(BaseModel):
+class PostOut(BaseModel):
+    id: str
+    title: str
+    content: str
+    createdAt: datetime
+
+class CommentCreate(BaseModel):
+    author: str
+    text: str
+
+class CommentOut(BaseModel):
     id: str
     postId: str
     author: str
     text: str
-    createdAt: Date
+    createdAt: datetime
 
-@app.post("/post")
-async def create_post(id: id, post_title: title):
-    return id, post_title
+
+comments = {}
+
+
+@app.post("/posts", response_model=PostOut)
+def create_post(post: PostCreate):
+    post_id = str(uuid.uuid4())
+    new_post = {
+        "id": post_id,
+        "title": post.title,
+        "content": post.content,
+        "createdAt": datetime.utcnow()
+    }
+    posts[post_id] = new_post
+    return new_post
+
+@app.get("/posts", response_model=List[PostOut])
+def get_posts():
+    return list(posts.values())
+
+@app.put("/posts/{post_id}", response_model=PostOut)
+def update_post(post_id: str, post: PostUpdate):
+    if post_id not in posts:
+        raise HTTPException(status_code=404, detail="Post not found")
+    if post.title:
+        posts[post_id]["title"] = post.title
+    if post.content:
+        posts[post_id]["content"] = post.content
+    return posts[post_id]
+
+@app.delete("/posts/{post_id}")
+def delete_post(post_id: str):
+    if post_id not in posts:
+        raise HTTPException(status_code=404, detail="Post not found")
+    # delete all related comments too
+    for cid in [cid for cid, c in comments.items() if c["postId"] == post_id]:
+        del comments[cid]
+    del posts[post_id]
+    return {"message": "Post and its comments deleted"}
+
+
+@app.post("/posts/{post_id}/comments", response_model=CommentOut)
+def add_comment(post_id: str, comment: CommentCreate):
+    if post_id not in posts:
+        raise HTTPException(status_code=404, detail="Post not found")
+    comment_id = str(uuid.uuid4())
+    new_comment = {
+        "id": comment_id,
+        "postId": post_id,
+        "author": comment.author,
+        "text": comment.text,
+        "createdAt": datetime.utcnow()
+    }
+    comments[comment_id] = new_comment
+    return new_comment
+
+@app.get("/posts/{post_id}/comments", response_model=List[CommentOut])
+def get_comments(post_id: str):
+    if post_id not in posts:
+        raise HTTPException(status_code=404, detail="Post not found")
+    return [c for c in comments.values() if c["postId"] == post_id]
+
+@app.delete("/comments/{comment_id}")
+def delete_comment(comment_id: str):
+    if comment_id not in comments:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    del comments[comment_id]
+    return {"message": "Comment deleted"}
